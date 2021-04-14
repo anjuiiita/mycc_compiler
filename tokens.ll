@@ -69,10 +69,10 @@ ident         {letter}{alphanum}*
 "#else"                       { ignoringDirective("#else"); }
 "#endif"                      { ignoringDirective("#endif"); }
 
-"void"                { yylval.type.set('V');   return TYPE; }
-"int"                 { yylval.type.set('I');   return TYPE; }
-"char"                { yylval.type.set('C');   return TYPE; }
-"float"               { yylval.type.set('F');   return TYPE; }
+"void"                { yylval.type.set('V'); yylval.type.setBytecode(strdup(yytext));  return TYPE; }
+"int"                 { yylval.type.set('I'); yylval.type.setBytecode(strdup(yytext));  return TYPE; }
+"char"                { yylval.type.set('C'); yylval.type.setBytecode(strdup(yytext));  return TYPE; }
+"float"               { yylval.type.set('F'); yylval.type.setBytecode(strdup(yytext));  return TYPE; }
 
 "const"               { return CONST; }
 "struct"              { return STRUCT; }

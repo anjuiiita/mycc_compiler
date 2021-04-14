@@ -98,6 +98,7 @@ progitem
     : vardecl
       {
         parse_data::declareGlobals($1);
+        parse_data::initGlobal();
       }
     | prototype
     | funcdef
@@ -126,7 +127,7 @@ idec
       {
         $$ = new identlist($1, 0);
       }
-    | IDENT LBRACKET INTCONST RBRACKET
+    | IDENT LBRACKET literal RBRACKET
       {
         $$ = new identlist($1, 1);
       }
