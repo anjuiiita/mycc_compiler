@@ -74,7 +74,7 @@ mycc -4 <input_file>
 
 Part 0, 1, 2 and 3 are working as before.
 
-In part 3, it generated the intermediate code for given input program
+In part 4, it generated the intermediate code for given input program
 Arrays, Expressions, Function calls, user functions and always present output, operators
 special methos clinit are implemented.
 EXTRA :  initialization, handling global variables.
