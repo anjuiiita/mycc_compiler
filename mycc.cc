@@ -30,7 +30,7 @@ int usage(const char* arg)
 int version(ostream &s)
 {
   s << "My bare-bones C compiler (for COM 440/540)\n";
-  s << "\tWritten by Andrew Miner (asminer@iastate.edu)\n";
+  s << "\tWritten by Anju Kumari (ank@iastate.edu)\n";
   s << "\tVersion 0.1\n";
   s << "\t5 January, 2021\n";
   return 0;
