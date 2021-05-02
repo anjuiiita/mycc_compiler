@@ -208,14 +208,23 @@ class parse_data {
     static identlist* getNextIdentVar(std::string local_data);
     static void initGlobal();
 
-    static void checkCondition(bool can_be_empty, const char* stmt, typeinfo cond, int lineno);
+    static void checkCondition(bool can_be_empty, const char* stmt, typeinfo cond, int lineno, const char* flag);
+    static typeinfo checkCondition1(bool can_be_empty, const char* stmt, typeinfo cond, int lineno, const char* flag);
     static void checkReturn(typeinfo type);
-    inline static void checkEmptyReturn() 
-    {
+    static void push_label();
+    static void loop_end_label();
+    static void ifmarker();
+    static void ifnomarker();
+    static void ifelsenomarker();
+    static void checkEmptyReturn();
+    static void loop_exp_marker();
+    /*{
       typeinfo T;
       T.set('V', 0);
       checkReturn(T);
-    }
+      THE_DATA.jvm->stack_mc.push_back("\t\treturn\n");
+      THE_DATA.current_function->return_flag = 1;
+    }*/
 
     static void addExprStmt(typeinfo type);
     static void load_stack(char* literal, bool flag);

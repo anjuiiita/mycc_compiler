@@ -15,6 +15,7 @@
   Just get tokens (mode 1)?
 */
 extern char tokens_only;
+extern int loop;
 
 /*
   Keep track of when a comment starts
@@ -78,7 +79,7 @@ ident         {letter}{alphanum}*
 "struct"              { return STRUCT; }
 
 "for"                 { return FOR; }
-"while"               { return WHILE; }
+"while"               { loop = 1; return WHILE; }
 "do"                  { return DO; }
 "if"                  { return IF; }
 "else"                { return ELSE; }

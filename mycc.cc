@@ -66,7 +66,9 @@ int compile(char mode, const char* infile, ostream &fout)
     return 7;
   }
 
-  initLexer(infile, '1' == mode);
+
+  initLexer(infile, '1' == mode, mode);
+  
 
   if ('1'==mode) {
     return dump_tokens(fout);
@@ -84,7 +86,9 @@ int compile(char mode, const char* infile, ostream &fout)
     return 0;
   }
   
-  if ( ('4' == mode) ) {
+   
+   
+   if ( ('4' == mode) || ('5' == mode) ) {
     typeinfo T;
     T.set('I', false);
     identlist* P = 0;

@@ -14,7 +14,8 @@ FILE * jF;
 char tokens_only;
 extern int yylineno;          /* flex manages this */
 extern const char* yytext;    /* flex also manages this */
-
+char last_mode;
+int loop;
 
 void yyset_in(FILE*);         /* flex gives this */
 
@@ -25,11 +26,13 @@ unsigned total_errors;
 #endif
 
 
-int  initLexer(const char* infile, char _tok_only)
+int  initLexer(const char* infile, char _tok_only, char _last_mode)
 {
 #ifdef STOP_ERRORS
   total_errors = 0;
 #endif
+  last_mode = _last_mode;
+  loop = 0;
   filename = infile;
   std::string jvm_code(infile);
   classname = jvm_code.replace(jvm_code.find(".c"), sizeof(".c") - 1, "");
@@ -38,6 +41,14 @@ int  initLexer(const char* infile, char _tok_only)
   fprintf(jF, "\n; Java assembly code\n\n");
   fprintf(jF, ".class public %s\n", classname.c_str());
   fprintf(jF, ".super java/lang/Object\n\n");
+  fprintf(jF, "; Global vars\n");
+  fprintf(jF, "\n.method <init> : ()V\n");
+  fprintf(jF, "\t.code stack 1 locals 1\n");
+  fprintf(jF, "\t\taload_0\n");
+  fprintf(jF, "\t\tinvokespecial Method java/lang/Object <init> ()V\n");
+  fprintf(jF, "\t\treturn\n");
+  fprintf(jF, "\t.end code\n");
+  fprintf(jF, ".end method\n\n");
   tokens_only = _tok_only;
   yylineno = 1;
   FILE* fin = fopen(infile, "r");

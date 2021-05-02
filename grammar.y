@@ -16,6 +16,8 @@ extern const char* filename;
 extern const char* jvm_file;
 extern std::string classname;
 extern FILE* jF;
+extern char last_mode;
+extern int loop;
 
 %}
 
@@ -27,6 +29,8 @@ extern FILE* jF;
   typelist* plist;
   int lineno;
 }
+
+
 
 %token <name> IDENT;
 %token <type> TYPE;
@@ -41,9 +45,9 @@ PLUS MINUS STAR SLASH MOD COLON QUEST TILDE PIPE AMP BANG DPIPE DAMP
 
 %type <idlist> ideclist idec vardecl formal fplist
 %type <func> funcdecl
-%type <type> literal expression exprorempty lvalue
+%type <type> literal expression exprorempty lvalue EXPWHILE
 %type <plist> paramlist
-%type <lineno> getlineno;
+%type <lineno> getlineno marker ifmarker ifnomarker ifelsenomarker turnloopOff getlinenoloop
 
 %nonassoc WITHOUT_ELSE
 %nonassoc ELSE
@@ -71,21 +75,31 @@ PLUS MINUS STAR SLASH MOD COLON QUEST TILDE PIPE AMP BANG DPIPE DAMP
 prog
     : program
       {
-        fprintf(jF, ".method public static main : ([Ljava/lang/String;)V\n");
-        fprintf(jF, "\t.code stack 2 locals 2\n");
-        fprintf(jF, "\tinvokestatic Method %s main ()I\n", classname.c_str());
-        fprintf(jF, "\tistore_1\n");
-        fprintf(jF, "\tgetstatic Field java/lang/System out Ljava/io/PrintStream;\n");
-        fprintf(jF, "\tldc 'Return code: '\n");
-        fprintf(jF, "\tinvokevirtual Method java/io/PrintStream print (Ljava/lang/String;)V\n");
-        fprintf(jF, "\tgetstatic Field java/lang/System out Ljava/io/PrintStream;\n");
-        fprintf(jF, "\tiload_1\n");
-        fprintf(jF, "\tinvokevirtual Method java/io/PrintStream println (I)V\n");
-        fprintf(jF, "\treturn\n");
-        fprintf(jF, "\t.end code\n");
-        fprintf(jF, ".end method\n");
+        if (last_mode == '5') {
+          fprintf(jF, ".method public static main : ([Ljava/lang/String;)V\n");
+          fprintf(jF, "\t.code stack 1 locals 1\n");
+          fprintf(jF, "\t\tinvokestatic Method %s main ()I\n", classname.c_str());
+          fprintf(jF, "\t\tpop\n");
+          fprintf(jF, "\t\treturn\n");
+          fprintf(jF, "\t.end code\n");
+          fprintf(jF, ".end method\n");
+        } else {
+          fprintf(jF, ".method public static main : ([Ljava/lang/String;)V\n");
+          fprintf(jF, "\t.code stack 2 locals 2\n");
+          fprintf(jF, "\t\tinvokestatic Method %s main ()I\n", classname.c_str());
+          fprintf(jF, "\t\tistore_1\n");
+          fprintf(jF, "\t\tgetstatic Field java/lang/System out Ljava/io/PrintStream;\n");
+          fprintf(jF, "\t\tldc 'Return code: '\n");
+          fprintf(jF, "\t\tinvokevirtual Method java/io/PrintStream print (Ljava/lang/String;)V\n");
+          fprintf(jF, "\t\tgetstatic Field java/lang/System out Ljava/io/PrintStream;\n");
+          fprintf(jF, "\t\tiload_1\n");
+          fprintf(jF, "\t\tinvokevirtual Method java/io/PrintStream println (I)V\n");
+          fprintf(jF, "\t\treturn\n");
+          fprintf(jF, "\t.end code\n");
+          fprintf(jF, ".end method\n");
+        }
+        
         fclose(jF);
-        //parse_data::show_machine_code();
       }
     ;
 
@@ -208,7 +222,7 @@ stmtblock
 
 stmtorblock
     : statement 
-    | stmtblock
+    | stmtblock  { loop = 0;}
     ;
 
 exprorempty
@@ -237,25 +251,29 @@ statement
       {
         parse_data::checkReturn($2);
       }
-    | IF LPAR expression getlineno RPAR stmtorblock %prec WITHOUT_ELSE
+    | IF LPAR expression getlineno RPAR stmtorblock ifnomarker %prec WITHOUT_ELSE
       {
-        parse_data::checkCondition(false, "if statement", $3, $4);
+        parse_data::checkCondition(false, "if statement", $3, $4, "if");
       }
-    | IF LPAR expression getlineno RPAR stmtorblock ELSE stmtorblock
+    | IF LPAR expression getlineno RPAR stmtorblock ifmarker ELSE stmtorblock ifnomarker
       {
-        parse_data::checkCondition(false, "if statement", $3, $4);
+        parse_data::checkCondition(false, "if statement", $3, $4, "ifelse");
       }
     | FOR LPAR exprorempty SEMI exprorempty getlineno SEMI exprorempty RPAR stmtorblock
       {
-        parse_data::checkCondition(true, "for loop", $5, $6);
+        parse_data::checkCondition(true, "for loop", $5, $6, "for");
       }
-    | WHILE LPAR expression getlineno RPAR stmtorblock
+    | WHILE LPAR getlinenoloop expression turnloopOff RPAR stmtorblock marker
       {
-        parse_data::checkCondition(false, "while loop", $3, $4);
+        parse_data::checkCondition(false, "while loop", $4, $3, "while");
+      }
+    | WHILE LPAR getlinenoloop EXPWHILE turnloopOff RPAR stmtorblock marker
+      {
+        parse_data::checkCondition1(false, "while loop", $4, $3, "while");
       }
     | DO stmtorblock WHILE LPAR expression getlineno RPAR
       {
-        parse_data::checkCondition(false, "do while loop", $5, $6);
+        parse_data::checkCondition(false, "do while loop", $5, $6, "dowhile");
       }
     ;
 
@@ -265,6 +283,58 @@ getlineno
         $$ = yylineno;
       }
     ;
+
+getlinenoloop
+    : /* empty but allows us to grab the line number at a specific point */
+      {
+        $$ = yylineno;
+        parse_data::push_label();
+      }
+    ;
+
+turnloopOff
+    : /* empty but allows us to grab the line number at a specific point */
+      {
+        $$ = yylineno;
+        loop = 0;
+      }
+    ;
+
+marker
+    : /* empty but allows us to grab the line number at a specific point */
+      {
+        $$ = yylineno;
+        parse_data::loop_end_label();
+      }
+    ;
+ifmarker
+    : /* empty but allows us to grab the line number at a specific point */
+      {
+        $$ = yylineno;
+        parse_data::ifmarker();
+      }
+    ;
+ifnomarker
+    : /* empty but allows us to grab the line number at a specific point */
+      {
+        $$ = yylineno;
+        parse_data::ifnomarker();
+      }
+    ;
+ifelsenomarker
+    : /* empty but allows us to grab the line number at a specific point */
+      {
+        $$ = yylineno;
+        parse_data::ifelsenomarker();
+      }
+    ;
+
+
+EXPWHILE
+    : IDENT 
+      { 
+        parse_data::loop_exp_marker();
+      }
 
 expression
     : literal

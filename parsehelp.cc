@@ -9,6 +9,7 @@
 #include <ctype.h>
 #include <vector>
 #include <fstream>
+#include <algorithm>
 #include <map>
 
 extern int yylineno;
@@ -16,6 +17,8 @@ extern const char* filename;
 extern const char* jvm_file;
 extern std::string classname;
 extern FILE* jF;
+extern int loop;
+extern int last_mode;
 
 /* ====================================================================== */
 
@@ -42,6 +45,7 @@ class function {
     stmtnode* stmtEnd;
 
     int lineno;
+    int labelCount;
 
   public:
     function(typeinfo T, char* n, identlist* F);
@@ -86,6 +90,15 @@ class function {
 
     inline identlist* getParams() const { return formals; }
     inline identlist* getLocals() const { return locals; }
+    inline int getlabelCount() { return labelCount; }
+    inline void incrementLabel() { labelCount++; }
+    std::map<std::string, int> label_map;
+    std::vector<std::string> label_vector;
+    std::vector<std::string> loop_vector;
+    std::string jump_label;
+    std::vector<std::string> iinc_stmt;
+    std::map<std::string, int> local_pos;
+    int return_flag;
 };
 
 /* ====================================================================== */
@@ -128,21 +141,12 @@ void parse_data::declareGlobals(identlist* L)
     identlist::reverseList(L), 
     TypecheckingOn() ? "Global variable" : 0
   );
-  fprintf(jF, "; Global vars\n");
   for (const identlist* curr = THE_DATA.globals; curr; curr=curr->next) {
         if (curr->is_array)
             fprintf(jF, ".field public static %s [%c\n", curr->name, curr->type.typecode);
         else
             fprintf(jF, ".field public static %s %c\n", curr->name, curr->type.typecode);
   }
-  
-  fprintf(jF, "\n.method <init> : ()V\n");
-  fprintf(jF, "\t.code stack 1 locals 1\n");
-  fprintf(jF, "\t\taload_0\n");
-  fprintf(jF, "\t\tinvokespecial Method java/lang/Object <init> ()V\n");
-  fprintf(jF, "\t\treturn\n");
-  fprintf(jF, "\t.end code\n");
-  fprintf(jF, ".end method\n\n");
 }
 
 void parse_data::initGlobal() {
@@ -220,6 +224,7 @@ function* parse_data::startFunction(typeinfo T, char* n, identlist* P)
       }
   }
 
+
   F = new function(T, n, P);
 
   if (F) {
@@ -231,6 +236,12 @@ function* parse_data::startFunction(typeinfo T, char* n, identlist* P)
     }
   }
 
+  identlist*p = P;
+  while(p) {
+      int m = F->local_pos.size();
+      F->local_pos.insert(std::pair<std::string, int>(p->name, m));
+      p = p->next;
+  }
   return (THE_DATA.current_function = F);
 }
 
@@ -249,7 +260,8 @@ void parse_data::startFunctionDef()
         i = i->next;
       }
       fprintf(jF, ".method public static %s : (%s)%c\n", THE_DATA.current_function->getName(), params.c_str(), t.typecode);
-
+      if (t.typecode == 'V')
+            THE_DATA.current_function->return_flag = 1;
       return;
     }
     THE_DATA.current_function->redefinition();
@@ -272,21 +284,28 @@ void parse_data::doneFunction(function* F, bool proto_only)
       count++;
       i = i->next;
     }
-    int l_count = 0;
+    int l_count = 1;
     while (l != NULL) {
       count++;
       l_count++;
       l = l->next;
     }
     fprintf(jF, "\t.code stack %d locals %d\n", THE_DATA.jvm->getStackDepth(), l_count);
+    if (THE_DATA.current_function->return_flag)
+        THE_DATA.jvm->stack_mc.push_back("\t\treturn ; implicit return\n");
     THE_DATA.jvm->show_stack();
+    THE_DATA.jvm->stack_mc.clear();
+    THE_DATA.current_function->label_vector.clear();
+    THE_DATA.jvm->machine_code.clear();
   }
-
   THE_DATA.current_function = 0;
 }
 
 typeinfo parse_data::buildUnary(char op, typeinfo opnd)
 {
+  if (op == '-') {
+    THE_DATA.jvm->machine_code.push_back("\t\tineg\n");
+  }
   typeinfo answer;
   answer.set('E', 0);
 
@@ -383,7 +402,6 @@ typeinfo parse_data::buildArith(typeinfo left, char op, typeinfo right)
         THE_DATA.jvm->machine_code.push_back("\t\tiand\n");
     }
     THE_DATA.jvm->pop_stack();
-    THE_DATA.jvm->pop_stack();
     THE_DATA.jvm->decStackDepth();
     THE_DATA.jvm->decStackDepth();
 
@@ -392,6 +410,7 @@ typeinfo parse_data::buildArith(typeinfo left, char op, typeinfo right)
 
 typeinfo parse_data::buildLogic(typeinfo left, const char* op, typeinfo right)
 {
+  
   typeinfo answer;
   answer.set('E', 0);
 
@@ -409,6 +428,127 @@ typeinfo parse_data::buildLogic(typeinfo left, const char* op, typeinfo right)
         std::cerr << "Operation not supported: " << left << ' ' << op << ' ' << right << "\n";
       }
 
+  }
+
+  if (strcmp(op, "==") == 0) {
+    int c = THE_DATA.current_function->getlabelCount();
+    if (loop) {
+        if (THE_DATA.current_function->jump_label == "") {
+            std::string cmd = "\t\tif_icmpne L" + std::to_string(c) + "\n";
+            THE_DATA.current_function->jump_label = "L" + std::to_string(c);
+            THE_DATA.jvm->machine_code.push_back(cmd);
+            THE_DATA.current_function->label_vector.push_back("L" + std::to_string(c));
+            THE_DATA.current_function->incrementLabel();
+        } else {
+            std::string cmd = "\t\tif_icmpne " + THE_DATA.current_function->jump_label + "\n";
+            THE_DATA.jvm->machine_code.push_back(cmd);
+        }
+    } else {
+        std::string cmd = "\t\tif_icmpne L" + std::to_string(c) + "\n";
+        THE_DATA.jvm->machine_code.push_back(cmd);
+        THE_DATA.current_function->incrementLabel();
+        THE_DATA.current_function->label_vector.push_back("L" + std::to_string(c));
+    }
+  }
+  if (strcmp(op, "!=") == 0) {
+    int c = THE_DATA.current_function->getlabelCount();
+    if (loop) {
+        if (THE_DATA.current_function->jump_label == "") {
+            std::string cmd = "\t\tif_icmpeq L" + std::to_string(c) + "\n";
+            THE_DATA.current_function->jump_label = "L" + std::to_string(c);
+            THE_DATA.jvm->machine_code.push_back(cmd);
+            THE_DATA.current_function->label_vector.push_back("L" + std::to_string(c));
+            THE_DATA.current_function->incrementLabel();
+        } else {
+            std::string cmd = "\t\tif_icmpeq " + THE_DATA.current_function->jump_label + "\n";
+            THE_DATA.jvm->machine_code.push_back(cmd);
+        }
+    } else {
+        std::string cmd = "\t\tif_icmpeq L" + std::to_string(c) + "\n";
+        THE_DATA.jvm->machine_code.push_back(cmd);
+        THE_DATA.current_function->incrementLabel();
+        THE_DATA.current_function->label_vector.push_back("L" + std::to_string(c));
+    }
+  }
+  if (strcmp(op, ">") == 0) {
+    int c = THE_DATA.current_function->getlabelCount();
+    if (loop) {
+        if (THE_DATA.current_function->jump_label == "") {
+            std::string cmd = "\t\tif_icmple L" + std::to_string(c) + "\n";
+            THE_DATA.current_function->jump_label = "L" + std::to_string(c);
+            THE_DATA.jvm->machine_code.push_back(cmd);
+            THE_DATA.current_function->label_vector.push_back("L" + std::to_string(c));
+            THE_DATA.current_function->incrementLabel();
+        } else {
+            std::string cmd = "\t\tif_icmple " + THE_DATA.current_function->jump_label + "\n";
+            THE_DATA.jvm->machine_code.push_back(cmd);
+        }
+    } else {
+        std::string cmd = "\t\tif_icmple L" + std::to_string(c) + "\n";
+        THE_DATA.jvm->machine_code.push_back(cmd);
+        THE_DATA.current_function->incrementLabel();
+        THE_DATA.current_function->label_vector.push_back("L" + std::to_string(c));
+    }
+  }
+  if (strcmp(op, ">=") == 0) {
+    int c = THE_DATA.current_function->getlabelCount();
+    if (loop) {
+        if (THE_DATA.current_function->jump_label == "") {
+            std::string cmd = "\t\tif_icmplt L" + std::to_string(c) + "\n";
+            THE_DATA.current_function->jump_label = "L" + std::to_string(c);
+            THE_DATA.jvm->machine_code.push_back(cmd);
+            THE_DATA.current_function->label_vector.push_back("L" + std::to_string(c));
+            THE_DATA.current_function->incrementLabel();
+        } else {
+            std::string cmd = "\t\tif_icmplt " + THE_DATA.current_function->jump_label + "\n";
+            THE_DATA.jvm->machine_code.push_back(cmd);
+        }
+    } else {
+        std::string cmd = "\t\tif_icmplt L" + std::to_string(c) + "\n";
+        THE_DATA.jvm->machine_code.push_back(cmd);
+        THE_DATA.current_function->incrementLabel();
+        THE_DATA.current_function->label_vector.push_back("L" + std::to_string(c));
+    }
+  }
+  if (strcmp(op, "<") == 0) {
+    int c = THE_DATA.current_function->getlabelCount();
+    if (loop) {
+        if (THE_DATA.current_function->jump_label == "") {
+            std::string cmd = "\t\tif_icmpge L" + std::to_string(c) + "\n";
+            THE_DATA.current_function->jump_label = "L" + std::to_string(c);
+            THE_DATA.jvm->machine_code.push_back(cmd);
+            THE_DATA.current_function->label_vector.push_back("L" + std::to_string(c));
+            THE_DATA.current_function->incrementLabel();
+        } else {
+            std::string cmd = "\t\tif_icmpge " + THE_DATA.current_function->jump_label + "\n";
+            THE_DATA.jvm->machine_code.push_back(cmd);
+        }
+    } else {
+        std::string cmd = "\t\tif_icmpge L" + std::to_string(c) + "\n";
+        THE_DATA.jvm->machine_code.push_back(cmd);
+        THE_DATA.current_function->incrementLabel();
+        THE_DATA.current_function->label_vector.push_back("L" + std::to_string(c));
+    }
+  }
+  if (strcmp(op, "<=") == 0) {
+    int c = THE_DATA.current_function->getlabelCount();
+    if (loop) {
+        if (THE_DATA.current_function->jump_label == "") {
+            std::string cmd = "\t\tif_icmpgt L" + std::to_string(c) + "\n";
+            THE_DATA.current_function->jump_label = "L" + std::to_string(c);
+            THE_DATA.jvm->machine_code.push_back(cmd);
+            THE_DATA.current_function->label_vector.push_back("L" + std::to_string(c));
+            THE_DATA.current_function->incrementLabel();
+        } else {
+            std::string cmd = "\t\tif_icmpgt " + THE_DATA.current_function->jump_label + "\n";
+            THE_DATA.jvm->machine_code.push_back(cmd);
+        }
+    } else {
+        std::string cmd = "\t\tif_icmpgt L" + std::to_string(c) + "\n";
+        THE_DATA.jvm->machine_code.push_back(cmd);
+        THE_DATA.current_function->incrementLabel();
+        THE_DATA.current_function->label_vector.push_back("L" + std::to_string(c));
+    }
   }
 
   return answer;
@@ -431,7 +571,15 @@ typeinfo parse_data::buildIncDec(bool pre, char op, typeinfo opnd)
         std::cerr << "crement lvalue of type " << opnd << "\n";
       }
   }
-
+  if (op == '-') {
+    THE_DATA.jvm->machine_code.push_back("\t\tiinc 0 -1\n");
+    THE_DATA.jvm->machine_code.push_back("\t\tiload_0\n");
+  }
+  if (op == '+') {
+    THE_DATA.jvm->machine_code.push_back("\t\tiinc 0 +1\n");
+    THE_DATA.jvm->machine_code.push_back("\t\tiload_0\n");
+  }
+    
   return answer;
 }
 
@@ -457,6 +605,7 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
 
     const identlist* var;
     int is_global = 0;
+    THE_DATA.jvm->pop_stack();
     std::string local_data = THE_DATA.jvm->peek_stack();
     if(THE_DATA.current_function)
         var = THE_DATA.current_function->find(local_data.c_str());
@@ -480,7 +629,9 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
     }
 
     if (var) {
-        int dep = THE_DATA.jvm->getStackDepth();
+        //int dep = THE_DATA.jvm->getStackDepth();
+        int dep = THE_DATA.current_function->local_pos[local_data];
+        
         std::string cmd = "\t\t";
         
         if (var && lhs.typecode == 'I') {
@@ -496,11 +647,12 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
             if (var->type.is_array) {
                 cmd += "iastore ; store to " + local_data + "\n";
             } else {
-                THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
+                if (last_mode != '5')
+                    THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
                 cmd += "istore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
             }
             //}
-            THE_DATA.jvm->local_pos[local_data] = dep;
+            //THE_DATA.current_function->local_pos[local_data] = dep;
         }
         if (var && lhs.typecode == 'C') {
             // if (is_global) {
@@ -514,11 +666,12 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
             if (var->type.is_array) {
                 cmd += "castore ; store to " + local_data + "\n";
             } else {
-                THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
+                if (last_mode != '5')
+                    THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
                 cmd += "cstore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
             }
             //}
-            THE_DATA.jvm->local_pos[local_data] = dep;
+            //THE_DATA.jvm->local_pos[local_data] = dep;
         }
         if (var && lhs.typecode == 'F') {
             /*if (is_global) {
@@ -532,11 +685,12 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
             if (var->type.is_array) {
                 cmd += "fastore ; store to " + local_data + "\n";
             } else {
-                THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
+                if (last_mode != '5')
+                    THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
                 cmd += "fstore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
             }
             //}
-            THE_DATA.jvm->local_pos[local_data] = dep;
+            //THE_DATA.jvm->local_pos[local_data] = dep;
         }
         THE_DATA.jvm->machine_code.push_back(cmd);
         THE_DATA.jvm->push_stack(local_data);
@@ -544,7 +698,7 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
         THE_DATA.jvm->incStackDepth();
         THE_DATA.jvm->incStackDepth();
 
-        if (var && !var->type.is_array) {
+        if (var && !var->type.is_array && last_mode != '5') {
             THE_DATA.jvm->machine_code.push_back("\t\tpop\n");
         }
 
@@ -600,12 +754,11 @@ typeinfo parse_data::buildLval(char* ident, bool flag)
       return error;
     }
 
-
     if (var && flag) {
         THE_DATA.jvm->push_stack(ident);
         THE_DATA.jvm->incStackDepth();
         int dep = THE_DATA.jvm->getStackDepth();
-        int pos = THE_DATA.jvm->local_pos[std::string(ident)];
+        int pos = THE_DATA.current_function->local_pos[std::string(ident)];
         if (var->type.typecode == 'I') {
           std::string cmd = "\t\t";
           if (is_global) {
@@ -674,6 +827,17 @@ typeinfo parse_data::buildLval(char* ident, bool flag)
   }
 
   return error;
+}
+
+void parse_data::loop_exp_marker() {
+    if (loop && last_mode == '5') {
+      std::string c = std::to_string(THE_DATA.current_function->getlabelCount());
+      std::string label = "\t\tifeq L" + c + "\n";
+      THE_DATA.current_function->incrementLabel();
+      THE_DATA.current_function->label_vector.push_back("L" + c);
+      THE_DATA.jvm->machine_code.push_back("\t\tiload_0\n");
+      THE_DATA.jvm->machine_code.push_back(label);
+    }
 }
 
 typeinfo parse_data::buildLvalBracket(char* ident, typeinfo index, bool flag)
@@ -774,9 +938,18 @@ typeinfo parse_data::buildFcall(char* ident, typelist* params)
           i = i->next;
         }
         THE_DATA.jvm->push_stack(ident);
-        std::string data = "\t\tinvokestatic Method libc " + std::string(ident) + " (" + params_type +")" + F->getType().typecode + "\n";
-        THE_DATA.jvm->incStackDepth();
-        THE_DATA.jvm->machine_code.push_back(data);
+        
+        if (std::string(ident) == "putchar") {
+            std::string data = "\t\tinvokestatic Method libc " + std::string(ident) + " (" + params_type +")" + F->getType().typecode + "\n";
+            THE_DATA.jvm->incStackDepth();
+            THE_DATA.jvm->machine_code.push_back(data);
+            THE_DATA.jvm->machine_code.push_back("\t\tpop\n");
+            THE_DATA.jvm->decStackDepth();
+        } else {
+            std::string data = "\t\tinvokestatic Method " + classname + " " + std::string(ident) + " (" + params_type +")" + F->getType().typecode + "\n";
+            THE_DATA.jvm->incStackDepth();
+            THE_DATA.jvm->machine_code.push_back(data);
+        }
 
       } else {
         startError(yylineno);
@@ -804,8 +977,11 @@ typeinfo parse_data::buildFcall(char* ident, typelist* params)
   return answer; 
 }
 
-void parse_data::checkCondition(bool can_be_empty, const char* stmt, typeinfo cond, int lineno)
+void parse_data::checkCondition(bool can_be_empty, const char* stmt, typeinfo cond, int lineno, const char* flag)
 {
+
+    std::vector<std::string>::iterator it;
+    
     THE_DATA.jvm->stack_mc.push_back("\t\t;; " + std::string(filename) + std::string(" ") + std::to_string(yylineno) + " expression\n");
 
     if (!TypecheckingOn()) return;
@@ -816,6 +992,26 @@ void parse_data::checkCondition(bool can_be_empty, const char* stmt, typeinfo co
 
     startError(lineno);
     std::cerr << "Condition of " << stmt << " has invalid type: " << cond << "\n";
+}
+
+typeinfo parse_data::checkCondition1(bool can_be_empty, const char* stmt, typeinfo cond, int lineno, const char* flag)
+{
+
+    typeinfo error;
+    error.set('E', 0);
+    std::vector<std::string>::iterator it;
+    
+    THE_DATA.jvm->stack_mc.push_back("\t\t;; " + std::string(filename) + std::string(" ") + std::to_string(yylineno) + " expression\n");
+    
+    return cond;
+}
+
+void parse_data::checkEmptyReturn() 
+{
+    typeinfo T;
+    T.set('V', 0);
+    checkReturn(T);
+    THE_DATA.jvm->stack_mc.push_back("\t\treturn\n");
 }
 
 void parse_data::checkReturn(typeinfo type)
@@ -852,7 +1048,6 @@ void parse_data::checkReturn(typeinfo type)
     if (type.typecode == 'C') {
       THE_DATA.jvm->stack_mc.push_back("\t\tcreturn\n");
     }
-    
     typeinfo Ft = THE_DATA.current_function->getType();
 
     if (type != Ft) {
@@ -862,11 +1057,70 @@ void parse_data::checkReturn(typeinfo type)
   }
 }
 
+void parse_data::push_label() {
+    if (loop && last_mode == '5') {
+        int c = THE_DATA.current_function->getlabelCount();
+        std::string label = "\tL" + std::to_string(c) + ":\n";
+        THE_DATA.jvm->machine_code.push_back(label);
+        THE_DATA.current_function->incrementLabel();
+        THE_DATA.current_function->label_vector.push_back("L"+std::to_string(c));
+    }
+}
+
+void parse_data::loop_end_label() {
+    if (THE_DATA.current_function->label_vector.size() > 1 && last_mode == '5') {
+        std::string label = THE_DATA.current_function->label_vector.back();
+        THE_DATA.current_function->label_vector.pop_back();
+        std::string cmd = "\t" + label + ":\n";
+
+        std::string label1 = THE_DATA.current_function->label_vector.back();
+        THE_DATA.current_function->label_vector.pop_back();
+        std::string gotocmd = "\t\tgoto " + label1 + "\n";
+
+        THE_DATA.jvm->machine_code.push_back(gotocmd);
+        THE_DATA.jvm->machine_code.push_back(cmd);
+    }
+    
+}
+
+void parse_data::ifmarker() {
+    int c = THE_DATA.current_function->getlabelCount();
+    std::string label1 = "\t\tgoto L" + std::to_string(c) + "\n";
+    if (THE_DATA.current_function->label_vector.size() > 1 && last_mode == '5') {
+        std::string label = THE_DATA.current_function->label_vector.back();
+        THE_DATA.current_function->label_vector.pop_back();
+        std::string cmd = "\t" + label + ":\n";
+        THE_DATA.current_function->label_vector.push_back("L" + std::to_string(c));
+        THE_DATA.jvm->machine_code.push_back(label1);
+        THE_DATA.jvm->machine_code.push_back(cmd);
+    }
+    
+}
+
+void parse_data::ifnomarker() {
+    if (THE_DATA.current_function->label_vector.size() > 0 && last_mode == '5')  {
+        std::string label = THE_DATA.current_function->label_vector.back();
+        THE_DATA.current_function->label_vector.pop_back();
+        std::string cmd = "\t" + label + ":\n";
+        THE_DATA.jvm->machine_code.push_back(cmd);
+    }
+    
+}
+
+void parse_data::ifelsenomarker() {
+    /*int c = THE_DATA.current_function->getlabelCount();
+    std::string label = "\tL" + std::to_string(c) + ":\n";
+    THE_DATA.jvm->machine_code.push_back(label);
+    THE_DATA.current_function->incrementLabel();*/
+}
+
 void parse_data::addExprStmt(typeinfo type)
-{
+{   
+    
     if (THE_DATA.current_function) {
         THE_DATA.current_function->addStatement(yylineno, type);
     }
+    
     THE_DATA.jvm->stack_mc.push_back("\t\t;; " + std::string(filename) + std::string(" ") + std::to_string(yylineno) + " expression\n");
     const identlist* var;
     int is_global = 0;
@@ -884,7 +1138,6 @@ void parse_data::addExprStmt(typeinfo type)
         if (is_global)
             THE_DATA.jvm->stack_mc.push_back("\t\tgetstatic Field array " + local_data + " [" + var->type.typecode + "\n");
     }
-    
     THE_DATA.jvm->stack_mc.insert(THE_DATA.jvm->stack_mc.end(), THE_DATA.jvm->machine_code.begin(), THE_DATA.jvm->machine_code.end());
     THE_DATA.jvm->machine_code.clear();
     THE_DATA.jvm->decStackDepth();
@@ -954,7 +1207,11 @@ parse_data::funclist* parse_data::funclist::reverseList(funclist *L)
 void parse_data::load_stack(char* literal, bool flag) {
     THE_DATA.jvm->push_stack(std::string(literal));
     THE_DATA.jvm->incStackDepth();
-    THE_DATA.jvm->machine_code.push_back("\t\tbipush " + std::string(literal) + "\n");
+    if (std::atoi(literal) < 6) {
+        THE_DATA.jvm->machine_code.push_back("\t\ticonst_" + std::string(literal) + "\n");
+    } else {
+        THE_DATA.jvm->machine_code.push_back("\t\tbipush " + std::string(literal) + "\n");
+    }
 }
 
 typeinfo parse_data::buildLiteral(typeinfo val, bool flag) {
@@ -1095,7 +1352,7 @@ identlist* identlist::Append(identlist* M, identlist* items, const char* wh)
   if (Mend) {
     while (Mend->next) Mend = Mend->next;
   }
-
+  
   while (items) {
     identlist* nextitem = items->next;
     items->next = 0;
@@ -1140,6 +1397,7 @@ function::function(typeinfo T, char* n, identlist* F)
   formals = identlist::Append(
     0, F, parse_data::TypecheckingOn() ? "Parameter" : 0
   );
+
   prototype_only = true;
   locals = 0;
 
@@ -1147,6 +1405,9 @@ function::function(typeinfo T, char* n, identlist* F)
   stmtEnd = 0;
 
   lineno = yylineno;
+  labelCount = 1;
+  jump_label = "";
+  return_flag = 0;
 }
 
 function::~function()
@@ -1230,7 +1491,12 @@ bool function::addLocals(identlist* L)
     identlist::reverseList(L), 
     parse_data::TypecheckingOn() ? "Local variable" : 0
   );
-
+  identlist*p = locals;
+  while(p) {
+      int m = local_pos.size();
+      local_pos.insert(std::pair<std::string, int>(p->name, m));
+      p = p->next;
+  }
   return true;
 }
 
@@ -1334,7 +1600,7 @@ void stack_machine::pop_stack()
         temp = st;
         st = st->next;
         temp->next = NULL;
-        free(temp);
+        //free(temp);
     }
 }
 
