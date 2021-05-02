@@ -647,7 +647,7 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
             if (var->type.is_array) {
                 cmd += "iastore ; store to " + local_data + "\n";
             } else {
-                if (last_mode != '5')
+                if (!last_mode)
                     THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
                 cmd += "istore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
             }
@@ -666,7 +666,7 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
             if (var->type.is_array) {
                 cmd += "castore ; store to " + local_data + "\n";
             } else {
-                if (last_mode != '5')
+                if (!last_mode)
                     THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
                 cmd += "cstore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
             }
@@ -685,7 +685,7 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
             if (var->type.is_array) {
                 cmd += "fastore ; store to " + local_data + "\n";
             } else {
-                if (last_mode != '5')
+                if (!last_mode)
                     THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
                 cmd += "fstore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
             }
@@ -698,7 +698,7 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
         THE_DATA.jvm->incStackDepth();
         THE_DATA.jvm->incStackDepth();
 
-        if (var && !var->type.is_array && last_mode != '5') {
+        if (var && !var->type.is_array && !last_mode) {
             THE_DATA.jvm->machine_code.push_back("\t\tpop\n");
         }
 
@@ -830,7 +830,7 @@ typeinfo parse_data::buildLval(char* ident, bool flag)
 }
 
 void parse_data::loop_exp_marker() {
-    if (loop && last_mode == '5') {
+    if (last_mode) {
       std::string c = std::to_string(THE_DATA.current_function->getlabelCount());
       std::string label = "\t\tifeq L" + c + "\n";
       THE_DATA.current_function->incrementLabel();
@@ -1058,7 +1058,7 @@ void parse_data::checkReturn(typeinfo type)
 }
 
 void parse_data::push_label() {
-    if (loop && last_mode == '5') {
+    if (last_mode) {
         int c = THE_DATA.current_function->getlabelCount();
         std::string label = "\tL" + std::to_string(c) + ":\n";
         THE_DATA.jvm->machine_code.push_back(label);
@@ -1068,7 +1068,7 @@ void parse_data::push_label() {
 }
 
 void parse_data::loop_end_label() {
-    if (THE_DATA.current_function->label_vector.size() > 1 && last_mode == '5') {
+    if (THE_DATA.current_function->label_vector.size() > 0 && last_mode) {
         std::string label = THE_DATA.current_function->label_vector.back();
         THE_DATA.current_function->label_vector.pop_back();
         std::string cmd = "\t" + label + ":\n";
@@ -1086,7 +1086,7 @@ void parse_data::loop_end_label() {
 void parse_data::ifmarker() {
     int c = THE_DATA.current_function->getlabelCount();
     std::string label1 = "\t\tgoto L" + std::to_string(c) + "\n";
-    if (THE_DATA.current_function->label_vector.size() > 1 && last_mode == '5') {
+    if (THE_DATA.current_function->label_vector.size() > 0 && last_mode) {
         std::string label = THE_DATA.current_function->label_vector.back();
         THE_DATA.current_function->label_vector.pop_back();
         std::string cmd = "\t" + label + ":\n";
@@ -1098,20 +1098,13 @@ void parse_data::ifmarker() {
 }
 
 void parse_data::ifnomarker() {
-    if (THE_DATA.current_function->label_vector.size() > 0 && last_mode == '5')  {
+    if (THE_DATA.current_function->label_vector.size() > 0 && last_mode)  {
         std::string label = THE_DATA.current_function->label_vector.back();
         THE_DATA.current_function->label_vector.pop_back();
         std::string cmd = "\t" + label + ":\n";
         THE_DATA.jvm->machine_code.push_back(cmd);
     }
     
-}
-
-void parse_data::ifelsenomarker() {
-    /*int c = THE_DATA.current_function->getlabelCount();
-    std::string label = "\tL" + std::to_string(c) + ":\n";
-    THE_DATA.jvm->machine_code.push_back(label);
-    THE_DATA.current_function->incrementLabel();*/
 }
 
 void parse_data::addExprStmt(typeinfo type)

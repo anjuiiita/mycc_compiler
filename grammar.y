@@ -47,7 +47,7 @@ PLUS MINUS STAR SLASH MOD COLON QUEST TILDE PIPE AMP BANG DPIPE DAMP
 %type <func> funcdecl
 %type <type> literal expression exprorempty lvalue EXPWHILE
 %type <plist> paramlist
-%type <lineno> getlineno marker ifmarker ifnomarker ifelsenomarker turnloopOff getlinenoloop
+%type <lineno> getlineno marker ifmarker ifnomarker turnloopOff getlinenoloop
 
 %nonassoc WITHOUT_ELSE
 %nonassoc ELSE
@@ -319,13 +319,6 @@ ifnomarker
       {
         $$ = yylineno;
         parse_data::ifnomarker();
-      }
-    ;
-ifelsenomarker
-    : /* empty but allows us to grab the line number at a specific point */
-      {
-        $$ = yylineno;
-        parse_data::ifelsenomarker();
       }
     ;
 

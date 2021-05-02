@@ -215,7 +215,6 @@ class parse_data {
     static void loop_end_label();
     static void ifmarker();
     static void ifnomarker();
-    static void ifelsenomarker();
     static void checkEmptyReturn();
     static void loop_exp_marker();
     /*{
