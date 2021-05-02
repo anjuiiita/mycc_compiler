@@ -289,8 +289,9 @@ void parse_data::doneFunction(function* F, bool proto_only)
     }
     fprintf(jF, "\t.code stack %d locals %d\n", THE_DATA.jvm->getStackDepth(), l_count);
     if (THE_DATA.current_function->return_flag) {
-        if (THE_DATA.jvm->machine_code.size() > 0) {
-            THE_DATA.jvm->stack_mc.insert(THE_DATA.jvm->stack_mc.end(), THE_DATA.jvm->machine_code.begin(), THE_DATA.jvm->machine_code.end());
+        std::string abc = THE_DATA.jvm->machine_code.back();
+        if (abc.find(":") != std::string::npos) {
+            THE_DATA.jvm->stack_mc.push_back(abc);
         }
         THE_DATA.jvm->stack_mc.push_back("\t\treturn ; implicit return\n");
     }
@@ -942,11 +943,12 @@ typeinfo parse_data::buildFcall(char* ident, typelist* params)
         }
         THE_DATA.jvm->push_stack(ident);
         
-        if (std::string(ident) == "putchar") {
+        if (std::string(ident) == "putchar" || std::string(ident) == "getchar") {
             std::string data = "\t\tinvokestatic Method libc " + std::string(ident) + " (" + params_type +")" + F->getType().typecode + "\n";
             THE_DATA.jvm->incStackDepth();
             THE_DATA.jvm->machine_code.push_back(data);
-            THE_DATA.jvm->machine_code.push_back("\t\tpop\n");
+            if (std::string(ident) == "putchar")
+                THE_DATA.jvm->machine_code.push_back("\t\tpop\n");
             THE_DATA.jvm->decStackDepth();
         } else {
             std::string data = "\t\tinvokestatic Method " + classname + " " + std::string(ident) + " (" + params_type +")" + F->getType().typecode + "\n";
@@ -1037,6 +1039,7 @@ void parse_data::checkReturn(typeinfo type)
       THE_DATA.jvm->stack_mc.push_back("\t\tcreturn\n");
     }
     typeinfo Ft = THE_DATA.current_function->getType();
+    THE_DATA.jvm->machine_code.clear();
 
     if (type != Ft) {
       startError(yylineno);
