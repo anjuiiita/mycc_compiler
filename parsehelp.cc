@@ -92,11 +92,8 @@ class function {
     inline identlist* getLocals() const { return locals; }
     inline int getlabelCount() { return labelCount; }
     inline void incrementLabel() { labelCount++; }
-    std::map<std::string, int> label_map;
     std::vector<std::string> label_vector;
-    std::vector<std::string> loop_vector;
     std::string jump_label;
-    std::vector<std::string> iinc_stmt;
     std::map<std::string, int> local_pos;
     int return_flag;
 };
@@ -291,8 +288,12 @@ void parse_data::doneFunction(function* F, bool proto_only)
       l = l->next;
     }
     fprintf(jF, "\t.code stack %d locals %d\n", THE_DATA.jvm->getStackDepth(), l_count);
-    if (THE_DATA.current_function->return_flag)
+    if (THE_DATA.current_function->return_flag) {
+        if (THE_DATA.jvm->machine_code.size() > 0) {
+            THE_DATA.jvm->stack_mc.insert(THE_DATA.jvm->stack_mc.end(), THE_DATA.jvm->machine_code.begin(), THE_DATA.jvm->machine_code.end());
+        }
         THE_DATA.jvm->stack_mc.push_back("\t\treturn ; implicit return\n");
+    }
     THE_DATA.jvm->show_stack();
     THE_DATA.jvm->stack_mc.clear();
     THE_DATA.current_function->label_vector.clear();
@@ -647,8 +648,7 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
             if (var->type.is_array) {
                 cmd += "iastore ; store to " + local_data + "\n";
             } else {
-                if (!last_mode)
-                    THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
+                THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
                 cmd += "istore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
             }
             //}
@@ -698,7 +698,7 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
         THE_DATA.jvm->incStackDepth();
         THE_DATA.jvm->incStackDepth();
 
-        if (var && !var->type.is_array && !last_mode) {
+        if (var && !var->type.is_array) {
             THE_DATA.jvm->machine_code.push_back("\t\tpop\n");
         }
 
@@ -829,8 +829,8 @@ typeinfo parse_data::buildLval(char* ident, bool flag)
   return error;
 }
 
-void parse_data::loop_exp_marker() {
-    if (last_mode) {
+typeinfo parse_data::loop_exp_marker(char* ident) {
+    if (last_mode && THE_DATA.current_function) {
       std::string c = std::to_string(THE_DATA.current_function->getlabelCount());
       std::string label = "\t\tifeq L" + c + "\n";
       THE_DATA.current_function->incrementLabel();
@@ -838,6 +838,9 @@ void parse_data::loop_exp_marker() {
       THE_DATA.jvm->machine_code.push_back("\t\tiload_0\n");
       THE_DATA.jvm->machine_code.push_back(label);
     }
+
+    const identlist* var = THE_DATA.current_function->find(ident);
+    return var->type;
 }
 
 typeinfo parse_data::buildLvalBracket(char* ident, typeinfo index, bool flag)
@@ -978,10 +981,7 @@ typeinfo parse_data::buildFcall(char* ident, typelist* params)
 }
 
 void parse_data::checkCondition(bool can_be_empty, const char* stmt, typeinfo cond, int lineno, const char* flag)
-{
-
-    std::vector<std::string>::iterator it;
-    
+{   
     THE_DATA.jvm->stack_mc.push_back("\t\t;; " + std::string(filename) + std::string(" ") + std::to_string(yylineno) + " expression\n");
 
     if (!TypecheckingOn()) return;
@@ -992,18 +992,6 @@ void parse_data::checkCondition(bool can_be_empty, const char* stmt, typeinfo co
 
     startError(lineno);
     std::cerr << "Condition of " << stmt << " has invalid type: " << cond << "\n";
-}
-
-typeinfo parse_data::checkCondition1(bool can_be_empty, const char* stmt, typeinfo cond, int lineno, const char* flag)
-{
-
-    typeinfo error;
-    error.set('E', 0);
-    std::vector<std::string>::iterator it;
-    
-    THE_DATA.jvm->stack_mc.push_back("\t\t;; " + std::string(filename) + std::string(" ") + std::to_string(yylineno) + " expression\n");
-    
-    return cond;
 }
 
 void parse_data::checkEmptyReturn() 
@@ -1093,6 +1081,7 @@ void parse_data::ifmarker() {
         THE_DATA.current_function->label_vector.push_back("L" + std::to_string(c));
         THE_DATA.jvm->machine_code.push_back(label1);
         THE_DATA.jvm->machine_code.push_back(cmd);
+        THE_DATA.current_function->incrementLabel();
     }
     
 }

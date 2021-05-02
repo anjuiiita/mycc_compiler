@@ -75,7 +75,7 @@ PLUS MINUS STAR SLASH MOD COLON QUEST TILDE PIPE AMP BANG DPIPE DAMP
 prog
     : program
       {
-        if (last_mode == '5') {
+        if (last_mode) {
           fprintf(jF, ".method public static main : ([Ljava/lang/String;)V\n");
           fprintf(jF, "\t.code stack 1 locals 1\n");
           fprintf(jF, "\t\tinvokestatic Method %s main ()I\n", classname.c_str());
@@ -269,7 +269,7 @@ statement
       }
     | WHILE LPAR getlinenoloop EXPWHILE turnloopOff RPAR stmtorblock marker
       {
-        parse_data::checkCondition1(false, "while loop", $4, $3, "while");
+        parse_data::checkCondition(false, "while loop", $4, $3, "while");
       }
     | DO stmtorblock WHILE LPAR expression getlineno RPAR
       {
@@ -326,7 +326,7 @@ ifnomarker
 EXPWHILE
     : IDENT 
       { 
-        parse_data::loop_exp_marker();
+        $$ = parse_data::loop_exp_marker($1);
       }
 
 expression

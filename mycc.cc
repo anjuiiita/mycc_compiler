@@ -67,7 +67,7 @@ int compile(char mode, const char* infile, ostream &fout)
   }
 
 
-  initLexer(infile, '1' == mode, mode);
+  initLexer(infile, '1' == mode, '5' == mode);
   
 
   if ('1'==mode) {
