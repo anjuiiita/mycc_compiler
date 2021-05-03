@@ -17,6 +17,7 @@ extern const char* jvm_file;
 extern std::string classname;
 extern FILE* jF;
 extern char last_mode;
+extern char second_last_mode;
 extern int loop;
 
 %}
@@ -83,7 +84,8 @@ prog
           fprintf(jF, "\t\treturn\n");
           fprintf(jF, "\t.end code\n");
           fprintf(jF, ".end method\n");
-        } else {
+        }
+        if (second_last_mode) {
           fprintf(jF, ".method public static main : ([Ljava/lang/String;)V\n");
           fprintf(jF, "\t.code stack 2 locals 2\n");
           fprintf(jF, "\t\tinvokestatic Method %s main ()I\n", classname.c_str());

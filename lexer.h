@@ -14,7 +14,7 @@
     @param  tokens_only   If true, just split into tokens (mode 1).
   Return true on success, 0 on failure (can't open file)
 */
-int initLexer(const char* infile, char tokens_only, char last_mode);
+int initLexer(const char* infile, char tokens_only, char last_mode, char second_last_mode);
 
 /*
   Display the current 'location' in input:

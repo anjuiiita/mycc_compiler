@@ -15,6 +15,7 @@ char tokens_only;
 extern int yylineno;          /* flex manages this */
 extern const char* yytext;    /* flex also manages this */
 char last_mode;
+char second_last_mode;
 int loop;
 
 void yyset_in(FILE*);         /* flex gives this */
@@ -26,12 +27,13 @@ unsigned total_errors;
 #endif
 
 
-int  initLexer(const char* infile, char _tok_only, char _last_mode)
+int  initLexer(const char* infile, char _tok_only, char _last_mode, char _second_last_mode)
 {
 #ifdef STOP_ERRORS
   total_errors = 0;
 #endif
   last_mode = _last_mode;
+  second_last_mode = _second_last_mode;
   loop = 0;
   filename = infile;
   std::string jvm_code(infile);

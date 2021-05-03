@@ -18,7 +18,8 @@ extern const char* jvm_file;
 extern std::string classname;
 extern FILE* jF;
 extern int loop;
-extern int last_mode;
+extern char last_mode;
+extern char second_last_mode;
 
 /* ====================================================================== */
 
@@ -604,7 +605,7 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
             std::cerr << "Operation not supported: " << lhs << ' ' << op << ' ' << rhs << "\n";
         }
     }
-    if (last_mode) {
+    if (last_mode || second_last_mode) {
         const identlist* var;
         int is_global = 0;
         THE_DATA.jvm->pop_stack();
@@ -667,7 +668,6 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
                 if (var->type.is_array) {
                     cmd += "castore ; store to " + local_data + "\n";
                 } else {
-                    if (!last_mode)
                         THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
                     cmd += "cstore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
                 }
@@ -686,7 +686,6 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
                 if (var->type.is_array) {
                     cmd += "fastore ; store to " + local_data + "\n";
                 } else {
-                    if (!last_mode)
                         THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
                     cmd += "fstore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
                 }
@@ -876,7 +875,7 @@ typeinfo parse_data::buildLvalBracket(char* ident, typeinfo index, bool flag)
       return error;
     }
     
-    if (last_mode) {
+    if (last_mode || second_last_mode) {
         if (var && flag) {
             THE_DATA.jvm->push_stack(ident);
             THE_DATA.jvm->incStackDepth();
@@ -944,7 +943,7 @@ typeinfo parse_data::buildFcall(char* ident, typelist* params)
           params_type += i->type.typecode;
           i = i->next;
         }
-        if (last_mode) {
+        if (last_mode || second_last_mode) {
             THE_DATA.jvm->push_stack(ident);
             
             if (std::string(ident) == "putchar" || std::string(ident) == "getchar") {
@@ -1016,7 +1015,7 @@ void parse_data::checkReturn(typeinfo type)
 
   if (THE_DATA.current_function) {
     typeinfo Ft = THE_DATA.current_function->getType();
-    if (last_mode) {
+    if (last_mode || second_last_mode) {
         THE_DATA.jvm->stack_mc.push_back("\t\t;; " + std::string(filename) + std::string(" ") + std::to_string(yylineno) + " return\n");
         
         const identlist* var;
@@ -1113,7 +1112,7 @@ void parse_data::addExprStmt(typeinfo type)
         THE_DATA.current_function->addStatement(yylineno, type);
     }
 
-    if (last_mode) {
+    if (last_mode || second_last_mode) {
     
         THE_DATA.jvm->stack_mc.push_back("\t\t;; " + std::string(filename) + std::string(" ") + std::to_string(yylineno) + " expression\n");
         const identlist* var;
