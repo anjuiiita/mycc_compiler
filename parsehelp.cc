@@ -604,23 +604,11 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
             std::cerr << "Operation not supported: " << lhs << ' ' << op << ' ' << rhs << "\n";
         }
     }
-
-    const identlist* var;
-    int is_global = 0;
-    THE_DATA.jvm->pop_stack();
-    std::string local_data = THE_DATA.jvm->peek_stack();
-    if(THE_DATA.current_function)
-        var = THE_DATA.current_function->find(local_data.c_str());
-
-    if (!var && THE_DATA.globals) {
-        is_global = 1;
-        var = THE_DATA.globals->find(local_data.c_str());
-    }
-
-    if (!var) {
+    if (last_mode) {
+        const identlist* var;
+        int is_global = 0;
         THE_DATA.jvm->pop_stack();
-        THE_DATA.jvm->decStackDepth();
-        local_data = THE_DATA.jvm->peek_stack();
+        std::string local_data = THE_DATA.jvm->peek_stack();
         if(THE_DATA.current_function)
             var = THE_DATA.current_function->find(local_data.c_str());
 
@@ -628,84 +616,97 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
             is_global = 1;
             var = THE_DATA.globals->find(local_data.c_str());
         }
-    }
 
-    if (var) {
-        //int dep = THE_DATA.jvm->getStackDepth();
-        int dep = THE_DATA.current_function->local_pos[local_data];
-        
-        std::string cmd = "\t\t";
-        
-        if (var && lhs.typecode == 'I') {
-            
-            // if (is_global) {
-            //     if (var->type.is_array) {
-            //         cmd = "\t\tputstatic Field " + classname  + std::string(" ") + local_data +  std::string(" [") + var->type.typecode + "\n";
-            //     } else {
-            //         cmd = "\t\tputstatic Field " + classname  + std::string(" ") + local_data +  std::string(" ") + var->type.typecode + "\n";
-            //     }
-            // } else {
-                
-            if (var->type.is_array) {
-                cmd += "iastore ; store to " + local_data + "\n";
-            } else {
-                THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
-                cmd += "istore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
-            }
-            //}
-            //THE_DATA.current_function->local_pos[local_data] = dep;
-        }
-        if (var && lhs.typecode == 'C') {
-            // if (is_global) {
-            //     if (var->type.is_array) {
-            //         cmd = "\t\tputstatic Field " + classname  + std::string(" ") + local_data +  std::string(" [") + var->type.typecode + "\n";
-            //     } else {
-            //         cmd = "\t\tputstatic Field " + classname  + std::string(" ") + local_data +  std::string(" ") + var->type.typecode + "\n";
-            //     }
-            // } else {
-            
-            if (var->type.is_array) {
-                cmd += "castore ; store to " + local_data + "\n";
-            } else {
-                if (!last_mode)
-                    THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
-                cmd += "cstore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
-            }
-            //}
-            //THE_DATA.jvm->local_pos[local_data] = dep;
-        }
-        if (var && lhs.typecode == 'F') {
-            /*if (is_global) {
-                if (var->type.is_array) {
-                    cmd = "\t\tputstatic Field " + classname  + std::string(" ") + local_data +  std::string(" [") + var->type.typecode + "\n";
-                } else {
-                    cmd = "\t\tputstatic Field " + classname  + std::string(" ") + local_data +  std::string(" ") + var->type.typecode + "\n";
-                }
-            } else {*/
-        
-            if (var->type.is_array) {
-                cmd += "fastore ; store to " + local_data + "\n";
-            } else {
-                if (!last_mode)
-                    THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
-                cmd += "fstore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
-            }
-            //}
-            //THE_DATA.jvm->local_pos[local_data] = dep;
-        }
-        THE_DATA.jvm->machine_code.push_back(cmd);
-        THE_DATA.jvm->push_stack(local_data);
-        THE_DATA.jvm->push_stack(local_data);
-        THE_DATA.jvm->incStackDepth();
-        THE_DATA.jvm->incStackDepth();
-
-        if (var && !var->type.is_array) {
-            THE_DATA.jvm->machine_code.push_back("\t\tpop\n");
-        }
-
-        if (strcmp(rhs.bytecode, (char*)"none") != 0) {
+        if (!var) {
             THE_DATA.jvm->pop_stack();
             THE_DATA.jvm->decStackDepth();
+            local_data = THE_DATA.jvm->peek_stack();
+            if(THE_DATA.current_function)
+                var = THE_DATA.current_function->find(local_data.c_str());
+
+            if (!var && THE_DATA.globals) {
+                is_global = 1;
+                var = THE_DATA.globals->find(local_data.c_str());
+            }
+        }
+
+        if (var) {
+            //int dep = THE_DATA.jvm->getStackDepth();
+            int dep = THE_DATA.current_function->local_pos[local_data];
+            
+            std::string cmd = "\t\t";
+            
+            if (var && lhs.typecode == 'I') {
+                
+                // if (is_global) {
+                //     if (var->type.is_array) {
+                //         cmd = "\t\tputstatic Field " + classname  + std::string(" ") + local_data +  std::string(" [") + var->type.typecode + "\n";
+                //     } else {
+                //         cmd = "\t\tputstatic Field " + classname  + std::string(" ") + local_data +  std::string(" ") + var->type.typecode + "\n";
+                //     }
+                // } else {
+                    
+                if (var->type.is_array) {
+                    cmd += "iastore ; store to " + local_data + "\n";
+                } else {
+                    THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
+                    cmd += "istore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
+                }
+                //}
+                //THE_DATA.current_function->local_pos[local_data] = dep;
+            }
+            if (var && lhs.typecode == 'C') {
+                // if (is_global) {
+                //     if (var->type.is_array) {
+                //         cmd = "\t\tputstatic Field " + classname  + std::string(" ") + local_data +  std::string(" [") + var->type.typecode + "\n";
+                //     } else {
+                //         cmd = "\t\tputstatic Field " + classname  + std::string(" ") + local_data +  std::string(" ") + var->type.typecode + "\n";
+                //     }
+                // } else {
+                
+                if (var->type.is_array) {
+                    cmd += "castore ; store to " + local_data + "\n";
+                } else {
+                    if (!last_mode)
+                        THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
+                    cmd += "cstore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
+                }
+                //}
+                //THE_DATA.jvm->local_pos[local_data] = dep;
+            }
+            if (var && lhs.typecode == 'F') {
+                /*if (is_global) {
+                    if (var->type.is_array) {
+                        cmd = "\t\tputstatic Field " + classname  + std::string(" ") + local_data +  std::string(" [") + var->type.typecode + "\n";
+                    } else {
+                        cmd = "\t\tputstatic Field " + classname  + std::string(" ") + local_data +  std::string(" ") + var->type.typecode + "\n";
+                    }
+                } else {*/
+            
+                if (var->type.is_array) {
+                    cmd += "fastore ; store to " + local_data + "\n";
+                } else {
+                    if (!last_mode)
+                        THE_DATA.jvm->machine_code.push_back("\t\tdup\n");
+                    cmd += "fstore_" + std::to_string(dep) + " ; store to " + local_data + "\n";
+                }
+                //}
+                //THE_DATA.jvm->local_pos[local_data] = dep;
+            }
+            THE_DATA.jvm->machine_code.push_back(cmd);
+            THE_DATA.jvm->push_stack(local_data);
+            THE_DATA.jvm->push_stack(local_data);
+            THE_DATA.jvm->incStackDepth();
+            THE_DATA.jvm->incStackDepth();
+
+            if (var && !var->type.is_array) {
+                THE_DATA.jvm->machine_code.push_back("\t\tpop\n");
+            }
+
+            if (strcmp(rhs.bytecode, (char*)"none") != 0) {
+                THE_DATA.jvm->pop_stack();
+                THE_DATA.jvm->decStackDepth();
+            }
         }
     }
     return answer;
@@ -875,26 +876,28 @@ typeinfo parse_data::buildLvalBracket(char* ident, typeinfo index, bool flag)
       return error;
     }
     
-    if (var && flag) {
-        THE_DATA.jvm->push_stack(ident);
-        THE_DATA.jvm->incStackDepth();
-        int dep = THE_DATA.jvm->getStackDepth();
-        int pos = THE_DATA.jvm->local_pos[std::string(ident)];
-        if (var->type.typecode == 'I') {
-          std::string cmd = "\t\tiaload ; load from " + std::string(ident) + "\n";
-          THE_DATA.jvm->machine_code.push_back(cmd);
+    if (last_mode) {
+        if (var && flag) {
+            THE_DATA.jvm->push_stack(ident);
+            THE_DATA.jvm->incStackDepth();
+            int dep = THE_DATA.jvm->getStackDepth();
+            int pos = THE_DATA.jvm->local_pos[std::string(ident)];
+            if (var->type.typecode == 'I') {
+            std::string cmd = "\t\tiaload ; load from " + std::string(ident) + "\n";
+            THE_DATA.jvm->machine_code.push_back(cmd);
+            }
+            if (var->type.typecode == 'C') {
+            std::string cmd = "\t\tcaload ; load from " + std::string(ident) + "\n";
+            THE_DATA.jvm->machine_code.push_back(cmd);
+            }
+            if (var->type.typecode == 'F') {
+            std::string cmd = "\t\tfaload ; load from " + std::string(ident) + "\n";
+            THE_DATA.jvm->machine_code.push_back(cmd);
+            }
         }
-        if (var->type.typecode == 'C') {
-          std::string cmd = "\t\tcaload ; load from " + std::string(ident) + "\n";
-          THE_DATA.jvm->machine_code.push_back(cmd);
+        if (var && !flag) {
+            THE_DATA.jvm->push_stack(ident);
         }
-        if (var->type.typecode == 'F') {
-          std::string cmd = "\t\tfaload ; load from " + std::string(ident) + "\n";
-          THE_DATA.jvm->machine_code.push_back(cmd);
-        }
-    }
-    if (var && !flag) {
-        THE_DATA.jvm->push_stack(ident);
     }
       
     free(ident);
@@ -941,19 +944,21 @@ typeinfo parse_data::buildFcall(char* ident, typelist* params)
           params_type += i->type.typecode;
           i = i->next;
         }
-        THE_DATA.jvm->push_stack(ident);
-        
-        if (std::string(ident) == "putchar" || std::string(ident) == "getchar") {
-            std::string data = "\t\tinvokestatic Method libc " + std::string(ident) + " (" + params_type +")" + F->getType().typecode + "\n";
-            THE_DATA.jvm->incStackDepth();
-            THE_DATA.jvm->machine_code.push_back(data);
-            if (std::string(ident) == "putchar")
-                THE_DATA.jvm->machine_code.push_back("\t\tpop\n");
-            THE_DATA.jvm->decStackDepth();
-        } else {
-            std::string data = "\t\tinvokestatic Method " + classname + " " + std::string(ident) + " (" + params_type +")" + F->getType().typecode + "\n";
-            THE_DATA.jvm->incStackDepth();
-            THE_DATA.jvm->machine_code.push_back(data);
+        if (last_mode) {
+            THE_DATA.jvm->push_stack(ident);
+            
+            if (std::string(ident) == "putchar" || std::string(ident) == "getchar") {
+                std::string data = "\t\tinvokestatic Method libc " + std::string(ident) + " (" + params_type +")" + F->getType().typecode + "\n";
+                THE_DATA.jvm->incStackDepth();
+                THE_DATA.jvm->machine_code.push_back(data);
+                if (std::string(ident) == "putchar")
+                    THE_DATA.jvm->machine_code.push_back("\t\tpop\n");
+                THE_DATA.jvm->decStackDepth();
+            } else {
+                std::string data = "\t\tinvokestatic Method " + classname + " " + std::string(ident) + " (" + params_type +")" + F->getType().typecode + "\n";
+                THE_DATA.jvm->incStackDepth();
+                THE_DATA.jvm->machine_code.push_back(data);
+            }
         }
 
       } else {
@@ -1010,37 +1015,39 @@ void parse_data::checkReturn(typeinfo type)
   if (!TypecheckingOn()) return;
 
   if (THE_DATA.current_function) {
-    THE_DATA.jvm->stack_mc.push_back("\t\t;; " + std::string(filename) + std::string(" ") + std::to_string(yylineno) + " return\n");
-    
-    const identlist* var;
-    int is_global = 0;
-    std::string local_data = THE_DATA.jvm->peek_stack();
-    if(THE_DATA.current_function)
-        var = THE_DATA.current_function->find(local_data.c_str());
-
-    if (!var && THE_DATA.globals) {
-        is_global = 1;
-        var = THE_DATA.globals->find(local_data.c_str());
-    }
-
-    if (var && var->is_array) {
-        if (is_global)
-            THE_DATA.jvm->stack_mc.push_back("\t\tgetstatic Field array " + local_data + " [" + var->type.typecode + "\n");
-    }
-    
-    THE_DATA.jvm->stack_mc.insert(THE_DATA.jvm->stack_mc.end(), THE_DATA.jvm->machine_code.begin(), THE_DATA.jvm->machine_code.end());
-    if (type.typecode == 'I') {
-      THE_DATA.jvm->stack_mc.push_back("\t\tireturn\n");
-    }
-    if (type.typecode == 'F') {
-      THE_DATA.jvm->stack_mc.push_back("\t\tfreturn\n");
-    }
-    if (type.typecode == 'C') {
-      THE_DATA.jvm->stack_mc.push_back("\t\tcreturn\n");
-    }
     typeinfo Ft = THE_DATA.current_function->getType();
-    THE_DATA.jvm->machine_code.clear();
+    if (last_mode) {
+        THE_DATA.jvm->stack_mc.push_back("\t\t;; " + std::string(filename) + std::string(" ") + std::to_string(yylineno) + " return\n");
+        
+        const identlist* var;
+        int is_global = 0;
+        std::string local_data = THE_DATA.jvm->peek_stack();
+        if(THE_DATA.current_function)
+            var = THE_DATA.current_function->find(local_data.c_str());
 
+        if (!var && THE_DATA.globals) {
+            is_global = 1;
+            var = THE_DATA.globals->find(local_data.c_str());
+        }
+
+        if (var && var->is_array) {
+            if (is_global)
+                THE_DATA.jvm->stack_mc.push_back("\t\tgetstatic Field array " + local_data + " [" + var->type.typecode + "\n");
+        }
+        
+        THE_DATA.jvm->stack_mc.insert(THE_DATA.jvm->stack_mc.end(), THE_DATA.jvm->machine_code.begin(), THE_DATA.jvm->machine_code.end());
+        if (type.typecode == 'I') {
+        THE_DATA.jvm->stack_mc.push_back("\t\tireturn\n");
+        }
+        if (type.typecode == 'F') {
+        THE_DATA.jvm->stack_mc.push_back("\t\tfreturn\n");
+        }
+        if (type.typecode == 'C') {
+        THE_DATA.jvm->stack_mc.push_back("\t\tcreturn\n");
+        }
+        
+        THE_DATA.jvm->machine_code.clear();
+    }
     if (type != Ft) {
       startError(yylineno);
       std::cerr << "Returning " << type << " in a function of type " << Ft << "\n";
@@ -1105,28 +1112,31 @@ void parse_data::addExprStmt(typeinfo type)
     if (THE_DATA.current_function) {
         THE_DATA.current_function->addStatement(yylineno, type);
     }
-    
-    THE_DATA.jvm->stack_mc.push_back("\t\t;; " + std::string(filename) + std::string(" ") + std::to_string(yylineno) + " expression\n");
-    const identlist* var;
-    int is_global = 0;
-    std::string local_data = THE_DATA.jvm->peek_stack();
-    
-    if(THE_DATA.current_function)
-        var = THE_DATA.current_function->find(local_data.c_str());
 
-    if (!var && THE_DATA.globals) {
-        is_global = 1;
-        var = THE_DATA.globals->find(local_data.c_str());
-    }
+    if (last_mode) {
+    
+        THE_DATA.jvm->stack_mc.push_back("\t\t;; " + std::string(filename) + std::string(" ") + std::to_string(yylineno) + " expression\n");
+        const identlist* var;
+        int is_global = 0;
+        std::string local_data = THE_DATA.jvm->peek_stack();
+        
+        if(THE_DATA.current_function)
+            var = THE_DATA.current_function->find(local_data.c_str());
 
-    if (var && var->is_array) {
-        if (is_global)
-            THE_DATA.jvm->stack_mc.push_back("\t\tgetstatic Field array " + local_data + " [" + var->type.typecode + "\n");
+        if (!var && THE_DATA.globals) {
+            is_global = 1;
+            var = THE_DATA.globals->find(local_data.c_str());
+        }
+
+        if (var && var->is_array) {
+            if (is_global)
+                THE_DATA.jvm->stack_mc.push_back("\t\tgetstatic Field array " + local_data + " [" + var->type.typecode + "\n");
+        }
+        THE_DATA.jvm->stack_mc.insert(THE_DATA.jvm->stack_mc.end(), THE_DATA.jvm->machine_code.begin(), THE_DATA.jvm->machine_code.end());
+        THE_DATA.jvm->machine_code.clear();
+        THE_DATA.jvm->decStackDepth();
+        THE_DATA.jvm->pop_stack();
     }
-    THE_DATA.jvm->stack_mc.insert(THE_DATA.jvm->stack_mc.end(), THE_DATA.jvm->machine_code.begin(), THE_DATA.jvm->machine_code.end());
-    THE_DATA.jvm->machine_code.clear();
-    THE_DATA.jvm->decStackDepth();
-    THE_DATA.jvm->pop_stack();
 }
 
 function* parse_data::find(const char* name) const
