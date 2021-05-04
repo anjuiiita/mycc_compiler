@@ -292,15 +292,16 @@ void parse_data::doneFunction(function* F, bool proto_only)
     }
     fprintf(jF, "\t.code stack %d locals %d\n", THE_DATA.jvm->getStackDepth(), l_count);
     if (THE_DATA.current_function->return_flag) {
-        std::string abc = THE_DATA.jvm->machine_code.back();
-        if (abc.find(":") != std::string::npos) {
-            THE_DATA.jvm->stack_mc.push_back(abc);
+        if (THE_DATA.jvm->machine_code.size() > 0) {
+          std::string abc = THE_DATA.jvm->machine_code.back();
+          if (abc.find(":") != std::string::npos) {
+              THE_DATA.jvm->stack_mc.push_back(abc);
+          }
+          THE_DATA.jvm->stack_mc.push_back("\t\treturn ; implicit return\n");
         }
-        THE_DATA.jvm->stack_mc.push_back("\t\treturn ; implicit return\n");
     }
     THE_DATA.jvm->show_stack();
     THE_DATA.jvm->stack_mc.clear();
-    THE_DATA.current_function->label_vector.clear();
     THE_DATA.jvm->machine_code.clear();
   }
   THE_DATA.current_function = 0;
@@ -624,7 +625,6 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
             is_global = 1;
             var = THE_DATA.globals->find(local_data.c_str());
         }
-
         if (!var) {
             THE_DATA.jvm->pop_stack();
             THE_DATA.jvm->decStackDepth();
@@ -637,7 +637,6 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
                 var = THE_DATA.globals->find(local_data.c_str());
             }
         }
-
         if (var) {
             //int dep = THE_DATA.jvm->getStackDepth();
             int dep = THE_DATA.current_function->local_pos[local_data];
@@ -708,7 +707,6 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
             if (var && !var->type.is_array) {
                 THE_DATA.jvm->machine_code.push_back("\t\tpop\n");
             }
-
             if (strcmp(rhs.bytecode, (char*)"none") != 0) {
                 THE_DATA.jvm->pop_stack();
                 THE_DATA.jvm->decStackDepth();
@@ -761,7 +759,6 @@ typeinfo parse_data::buildLval(char* ident, bool flag)
       free(ident);
       return error;
     }
-
     if (var && flag) {
         THE_DATA.jvm->push_stack(ident);
         THE_DATA.jvm->incStackDepth();
@@ -836,7 +833,6 @@ typeinfo parse_data::buildLval(char* ident, bool flag)
       THE_DATA.current_function->while_cond = label;
       THE_DATA.current_function->while_cond_label = "L" + c;
     }
-
     free(ident);
     return var->type;
   }
@@ -969,7 +965,6 @@ typeinfo parse_data::buildFcall(char* ident, typelist* params)
         }
         if (last_mode || second_last_mode) {
             THE_DATA.jvm->push_stack(ident);
-            
             if (std::string(ident) == "putchar" || std::string(ident) == "getchar") {
                 std::string data = "\t\tinvokestatic Method libc " + std::string(ident) + " (" + params_type +")" + F->getType().typecode + "\n";
                 THE_DATA.jvm->incStackDepth();
@@ -1116,7 +1111,6 @@ void parse_data::ifmarker() {
         THE_DATA.jvm->machine_code.push_back(cmd);
         THE_DATA.current_function->incrementLabel();
     }
-    
 }
 
 void parse_data::ifnomarker() {
@@ -1126,7 +1120,6 @@ void parse_data::ifnomarker() {
         std::string cmd = "\t" + label + ":\n";
         THE_DATA.jvm->machine_code.push_back(cmd);
     }
-    
 }
 
 void parse_data::addExprStmt(typeinfo type)
@@ -1135,7 +1128,6 @@ void parse_data::addExprStmt(typeinfo type)
     if (THE_DATA.current_function) {
         THE_DATA.current_function->addStatement(yylineno, type);
     }
-
     if (last_mode || second_last_mode) {
     
         THE_DATA.jvm->stack_mc.push_back("\t\t;; " + std::string(filename) + std::string(" ") + std::to_string(yylineno) + " expression\n");
