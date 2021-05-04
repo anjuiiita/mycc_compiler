@@ -6,7 +6,7 @@
 
 \documentclass{article}
 
-\title{COM S 540 Part 0 Solution}
+\title{COM S 540 Project }
 \author{Anju Kumari}
 \date{}
 \usepackage{graphicx}
@@ -25,6 +25,7 @@ Valid modes: \\
 -2: Part 2 Syntax Analyzer\\
 -3: Part 3 Semantic Analyzer \\
 -4: Part 4 Intermediate code generator \\
+-5: Part 5 Code generation\\
 
 {\it Date Structure:} for part 0, I used fstream library to open and read from file. \\
 Only mode 0 is impletemented in this file which gives the information about auther, version and date. \\
@@ -68,8 +69,8 @@ This also cleans the auto generated files. \\
 
 \subsection*{Readme.md}
 This file explain how to build the compiler and run it. \\
-For part 0, only mode 0 is implemented which gives information about the author, version and date. \\
-For Part 1,  mode 1 is implemented where flex is used to tokenize the input file. \\
+{ \bf For part 0}, only mode 0 is implemented which gives information about the author, version and date. \\
+{ \bf For Part 1},  mode 1 is implemented where flex is used to tokenize the input file. \\
 $\#$include is implemented.
 If there is error opening include file, error is genrated and if a cycle if detected then also Error is generated at max depth 256. \\
 
@@ -78,7 +79,7 @@ $\#$define is also implemented, if the defined var is a keyword, it generates ap
 $\#$ifdef, ifndef, else, endif mismatched detection is implemented.
 And if indentifier if not defined,  error is generated.
 
-For part 2,  mode 2 is implemented which uses lex and yacc to tokenize the input file and build parse tree. To run mode 2 please run below command.
+{ \bf For part 2},  mode 2 is implemented which uses lex and yacc to tokenize the input file and build parse tree. To run mode 2 please run below command.
 
 mycc -2 $\langle input file\rangle$
 
@@ -88,7 +89,7 @@ In part 2, it checks only the input file syntax.  \\
 Production rules are defined to check the syntax \\
 EXTRA : variable initialization, CONSTANTS, STRUCT, struct member selection are defined. \\
 
-For part 3,  mode 3 is implemented which uses lex and yacc to tokenize the input file and build parse tree. \\
+{ \bf For part 3},  mode 3 is implemented which uses lex and yacc to tokenize the input file and build parse tree. \\
 Did semantic analysis using symbol tables. \\
 
 To run mode 3 please run below command. \\
@@ -101,7 +102,7 @@ In part 3, it does only the input file semantic analysis. \\
 Production rules are defined to check the syntax \\
 EXTRA :  initialization, const, user-defined structs, struct member selection are defined. \\
 
-For part 4,  mode 4 is implemented which stack machine to generate java bytecode using stack machin code.
+{ \bf For part 4},  mode 4 is implemented which stack machine to generate java bytecode using stack machin code.
 
 To run mode 4 please run below command.
 
@@ -113,6 +114,19 @@ In part 4, it generated the intermediate code for given input program
 Arrays, Expressions, Function calls, user functions and always present output, operators
 special methos clinit are implemented.
 EXTRA :  initialization, handling global variables.
+
+{ \bf  For Part 5}, mode 5 is implemented which uses marker in production rules to create labels for control flow. 
+
+To run mode 5 please run below command.
+
+mycc -5 $\langle input file\rangle$ \\
+
+Part 0, 1, 2, 3 and 4 are working as before.
+
+In part 5,  Code generation is implemented for given input program
+
+Control flow for if, if else, while is implemented. 
+
 
 
 \end{document}

@@ -79,6 +79,18 @@ Arrays, Expressions, Function calls, user functions and always present output, o
 special methos clinit are implemented.
 EXTRA :  initialization, handling global variables.
 
+## Feature Part 4
+For Part 5 mode 5 is implemented which uses marker in production rules to create labels for control flow. 
+
+To run mode 5 please run below command.
+
+mycc -5 <input_file>
+
+Part 0, 1, 2, 3 and 4 are working as before.
+
+In part 5,  Code generation is implemented for given input program
+
+Control flow for if, if else, while is implemented. 
 
 ## To read from input file please run below command
 
