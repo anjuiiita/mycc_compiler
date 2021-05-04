@@ -296,9 +296,9 @@ void parse_data::doneFunction(function* F, bool proto_only)
           std::string abc = THE_DATA.jvm->machine_code.back();
           if (abc.find(":") != std::string::npos) {
               THE_DATA.jvm->stack_mc.push_back(abc);
-          }
-          THE_DATA.jvm->stack_mc.push_back("\t\treturn ; implicit return\n");
+          } 
         }
+        THE_DATA.jvm->stack_mc.push_back("\t\treturn ; implicit return\n");
     }
     THE_DATA.jvm->show_stack();
     THE_DATA.jvm->stack_mc.clear();
@@ -407,6 +407,7 @@ typeinfo parse_data::buildArith(typeinfo left, char op, typeinfo right)
     if (op == '&') {
         THE_DATA.jvm->machine_code.push_back("\t\tiand\n");
     }
+    THE_DATA.jvm->pop_stack();
     THE_DATA.jvm->pop_stack();
     THE_DATA.jvm->decStackDepth();
     THE_DATA.jvm->decStackDepth();
@@ -616,8 +617,14 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
     if (last_mode || second_last_mode) {
         const identlist* var;
         int is_global = 0;
-        THE_DATA.jvm->pop_stack();
+        //THE_DATA.jvm->pop_stack();
         std::string local_data = THE_DATA.jvm->peek_stack();
+        for (funclist* curr = THE_DATA.functions; curr; curr = curr->next) {
+          if (curr->F->name_matches(local_data.c_str())) {
+            THE_DATA.jvm->pop_stack();
+            local_data = THE_DATA.jvm->peek_stack();
+          }
+        }
         if(THE_DATA.current_function)
             var = THE_DATA.current_function->find(local_data.c_str());
 
@@ -640,6 +647,12 @@ typeinfo parse_data::buildUpdate(typeinfo lhs, const char* op, typeinfo rhs)
         if (var) {
             //int dep = THE_DATA.jvm->getStackDepth();
             int dep = THE_DATA.current_function->local_pos[local_data];
+            if (THE_DATA.jvm->store_val != "") {
+              local_data = THE_DATA.jvm->store_val;
+              dep = THE_DATA.current_function->local_pos[local_data];
+              THE_DATA.jvm->store_val = "";
+            }
+            
             
             std::string cmd = "\t\t";
             
@@ -824,6 +837,7 @@ typeinfo parse_data::buildLval(char* ident, bool flag)
     }
 
     if (var && !flag) {
+        THE_DATA.jvm->store_val = ident;
         THE_DATA.jvm->push_stack(ident);
     }
 
@@ -1572,6 +1586,7 @@ void function::display(std::ostream &out, bool show_types) const
 stack_machine::stack_machine() {
     stack_depth = 0;
     st = NULL;
+    store_val = "";
 }
 
 stack_machine::~stack_machine() {

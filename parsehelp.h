@@ -139,6 +139,7 @@ class stack_machine {
         std::string peek_stack();
         bool isStackEmpty();
         void show_stack();
+        std::string store_val;
         inline int getStackDepth() {
             return stack_depth;
         }
