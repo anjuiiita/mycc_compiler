@@ -95,6 +95,8 @@ class function {
     inline void incrementLabel() { labelCount++; }
     std::vector<std::string> label_vector;
     std::string jump_label;
+    std::string while_cond;
+    std::string while_cond_label;
     std::map<std::string, int> local_pos;
     int return_flag;
 };
@@ -431,6 +433,11 @@ typeinfo parse_data::buildLogic(typeinfo left, const char* op, typeinfo right)
         std::cerr << "Operation not supported: " << left << ' ' << op << ' ' << right << "\n";
       }
 
+  }
+
+  if(THE_DATA.current_function->while_cond != "") {
+    THE_DATA.current_function->while_cond = "";
+    THE_DATA.current_function->while_cond_label = "";
   }
 
   if (strcmp(op, "==") == 0) {
@@ -823,6 +830,13 @@ typeinfo parse_data::buildLval(char* ident, bool flag)
         THE_DATA.jvm->push_stack(ident);
     }
 
+    if (var && loop) {
+      std::string c = std::to_string(THE_DATA.current_function->getlabelCount());
+      std::string label = "\t\tifeq L" + c + "\n";
+      THE_DATA.current_function->while_cond = label;
+      THE_DATA.current_function->while_cond_label = "L" + c;
+    }
+
     free(ident);
     return var->type;
   }
@@ -830,18 +844,28 @@ typeinfo parse_data::buildLval(char* ident, bool flag)
   return error;
 }
 
-typeinfo parse_data::loop_exp_marker(char* ident) {
-    if (last_mode && THE_DATA.current_function) {
+void parse_data::loop_exp_marker() {
+    if (THE_DATA.current_function && last_mode) {
+      if(THE_DATA.current_function->while_cond != "") {
+        THE_DATA.current_function->incrementLabel();
+        THE_DATA.current_function->label_vector.push_back(THE_DATA.current_function->while_cond_label);
+        //THE_DATA.jvm->machine_code.push_back("\t\tiload_0\n");
+        THE_DATA.jvm->machine_code.push_back(THE_DATA.current_function->while_cond);
+      }
+    }
+    /*if (last_mode && THE_DATA.current_function) {
       std::string c = std::to_string(THE_DATA.current_function->getlabelCount());
       std::string label = "\t\tifeq L" + c + "\n";
+      THE_DATA.current_function->while_cond = label;
+      THE_DATA.current_function->while_cond_label = "L" + c;
       THE_DATA.current_function->incrementLabel();
       THE_DATA.current_function->label_vector.push_back("L" + c);
       THE_DATA.jvm->machine_code.push_back("\t\tiload_0\n");
       THE_DATA.jvm->machine_code.push_back(label);
-    }
+    }*/
 
-    const identlist* var = THE_DATA.current_function->find(ident);
-    return var->type;
+    //const identlist* var = THE_DATA.current_function->find(ident);
+    //return var->type;
 }
 
 typeinfo parse_data::buildLvalBracket(char* ident, typeinfo index, bool flag)

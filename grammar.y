@@ -269,10 +269,6 @@ statement
       {
         parse_data::checkCondition(false, "while loop", $4, $3, "while");
       }
-    | WHILE LPAR getlinenoloop EXPWHILE turnloopOff RPAR stmtorblock marker
-      {
-        parse_data::checkCondition(false, "while loop", $4, $3, "while");
-      }
     | DO stmtorblock WHILE LPAR expression getlineno RPAR
       {
         parse_data::checkCondition(false, "do while loop", $5, $6, "dowhile");
@@ -299,6 +295,7 @@ turnloopOff
       {
         $$ = yylineno;
         loop = 0;
+        parse_data::loop_exp_marker();
       }
     ;
 
