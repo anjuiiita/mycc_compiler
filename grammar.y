@@ -46,7 +46,7 @@ PLUS MINUS STAR SLASH MOD COLON QUEST TILDE PIPE AMP BANG DPIPE DAMP
 
 %type <idlist> ideclist idec vardecl formal fplist
 %type <func> funcdecl
-%type <type> literal expression exprorempty lvalue EXPWHILE
+%type <type> literal expression exprorempty lvalue
 %type <plist> paramlist
 %type <lineno> getlineno marker ifmarker ifnomarker turnloopOff getlinenoloop
 
@@ -321,12 +321,6 @@ ifnomarker
       }
     ;
 
-
-EXPWHILE
-    : IDENT 
-      { 
-        $$ = parse_data::loop_exp_marker($1);
-      }
 
 expression
     : literal
