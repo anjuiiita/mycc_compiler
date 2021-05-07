@@ -19,6 +19,7 @@ extern FILE* jF;
 extern char last_mode;
 extern char second_last_mode;
 extern int loop;
+extern int if_flag;
 
 %}
 
@@ -48,7 +49,7 @@ PLUS MINUS STAR SLASH MOD COLON QUEST TILDE PIPE AMP BANG DPIPE DAMP
 %type <func> funcdecl
 %type <type> literal expression exprorempty lvalue
 %type <plist> paramlist
-%type <lineno> getlineno marker ifmarker ifnomarker turnloopOff getlinenoloop
+%type <lineno> getlineno marker ifmarker ifnomarker turnloopOff getlinenoloop turnIfOff
 
 %nonassoc WITHOUT_ELSE
 %nonassoc ELSE
@@ -253,11 +254,11 @@ statement
       {
         parse_data::checkReturn($2);
       }
-    | IF LPAR expression getlineno RPAR stmtorblock ifnomarker %prec WITHOUT_ELSE
+    | IF LPAR expression getlineno turnIfOff RPAR stmtorblock ifnomarker %prec WITHOUT_ELSE
       {
         parse_data::checkCondition(false, "if statement", $3, $4, "if");
       }
-    | IF LPAR expression getlineno RPAR stmtorblock ifmarker ELSE stmtorblock ifnomarker
+    | IF LPAR expression getlineno turnIfOff RPAR stmtorblock ifmarker ELSE stmtorblock ifnomarker
       {
         parse_data::checkCondition(false, "if statement", $3, $4, "ifelse");
       }
@@ -272,6 +273,15 @@ statement
     | DO stmtorblock WHILE LPAR expression getlineno RPAR
       {
         parse_data::checkCondition(false, "do while loop", $5, $6, "dowhile");
+      }
+    ;
+
+turnIfOff
+    :
+      {
+        $$ = yylineno;
+        if_flag = 0;
+        parse_data::if_cond_exp();
       }
     ;
 

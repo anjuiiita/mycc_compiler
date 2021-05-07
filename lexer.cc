@@ -17,6 +17,7 @@ extern const char* yytext;    /* flex also manages this */
 char last_mode;
 char second_last_mode;
 int loop;
+int if_flag;
 
 void yyset_in(FILE*);         /* flex gives this */
 
@@ -35,6 +36,7 @@ int  initLexer(const char* infile, char _tok_only, char _last_mode, char _second
   last_mode = _last_mode;
   second_last_mode = _second_last_mode;
   loop = 0;
+  if_flag = 0;
   filename = infile;
   std::string jvm_code(infile);
   classname = jvm_code.replace(jvm_code.find(".c"), sizeof(".c") - 1, "");

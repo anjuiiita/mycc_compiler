@@ -20,6 +20,7 @@ extern FILE* jF;
 extern int loop;
 extern char last_mode;
 extern char second_last_mode;
+extern int if_flag;
 
 /* ====================================================================== */
 
@@ -99,6 +100,8 @@ class function {
     std::string while_cond_label;
     std::map<std::string, int> local_pos;
     int return_flag;
+    std::string if_cond;
+    std::string if_cond_label;
 };
 
 /* ====================================================================== */
@@ -312,6 +315,9 @@ typeinfo parse_data::buildUnary(char op, typeinfo opnd)
   if (op == '-') {
     THE_DATA.jvm->machine_code.push_back("\t\tineg\n");
   }
+  if (op == '!') {
+    THE_DATA.jvm->machine_code.push_back("\t\tifne\n");
+  }
   typeinfo answer;
   answer.set('E', 0);
 
@@ -440,6 +446,11 @@ typeinfo parse_data::buildLogic(typeinfo left, const char* op, typeinfo right)
   if(THE_DATA.current_function->while_cond != "") {
     THE_DATA.current_function->while_cond = "";
     THE_DATA.current_function->while_cond_label = "";
+  }
+
+  if(THE_DATA.current_function->if_cond != "") {
+    THE_DATA.current_function->if_cond = "";
+    THE_DATA.current_function->if_cond_label = "";
   }
 
   if (strcmp(op, "==") == 0) {
@@ -847,11 +858,29 @@ typeinfo parse_data::buildLval(char* ident, bool flag)
       THE_DATA.current_function->while_cond = label;
       THE_DATA.current_function->while_cond_label = "L" + c;
     }
+
+    if (var && if_flag) {
+      std::string c = std::to_string(THE_DATA.current_function->getlabelCount());
+      std::string label = "\t\tifeq L" + c + "\n";
+      THE_DATA.current_function->if_cond = label;
+      THE_DATA.current_function->if_cond_label = "L" + c;
+    }
+
     free(ident);
     return var->type;
   }
 
   return error;
+}
+
+void parse_data::if_cond_exp() {
+  if (THE_DATA.current_function && last_mode) {
+    if (THE_DATA.current_function->if_cond != "") {
+      THE_DATA.current_function->incrementLabel();
+      THE_DATA.current_function->label_vector.push_back(THE_DATA.current_function->if_cond_label);
+      THE_DATA.jvm->machine_code.push_back(THE_DATA.current_function->if_cond);
+    }
+  }
 }
 
 void parse_data::loop_exp_marker() {

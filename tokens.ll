@@ -16,6 +16,7 @@
 */
 extern char tokens_only;
 extern int loop;
+extern int if_flag;
 
 /*
   Keep track of when a comment starts
@@ -81,7 +82,7 @@ ident         {letter}{alphanum}*
 "for"                 { return FOR; }
 "while"               { loop = 1; return WHILE; }
 "do"                  { return DO; }
-"if"                  { return IF; }
+"if"                  { if_flag = 1; return IF; }
 "else"                { return ELSE; }
 "break"               { return BREAK; }
 "continue"            { return CONTINUE; }

@@ -218,6 +218,7 @@ class parse_data {
     static void ifnomarker();
     static void checkEmptyReturn();
     static void loop_exp_marker();
+    static void if_cond_exp();
     /*{
       typeinfo T;
       T.set('V', 0);
